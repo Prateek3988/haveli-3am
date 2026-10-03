@@ -2,44 +2,185 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>HAVELI — 3 AM</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
     background: #000;
     color: #c00;
     font-family: 'Courier New', monospace;
     height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    user-select: none;
+    position: fixed;
+  }
+  #game {
+    position: relative;
+    width: 100%;
+    height: 100%;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    overflow: hidden;
     text-align: center;
+    padding: 20px;
   }
-  #scene {
-    animation: flicker 3s infinite;
+
+  /* ===== INTRO SCREEN ===== */
+  #intro {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    transition: opacity 1.5s ease;
   }
-  h1 {
-    font-size: 3em;
-    letter-spacing: 8px;
-    text-shadow: 0 0 20px #f00, 0 0 40px #900;
+  #intro.fade-out { opacity: 0; pointer-events: none; }
+
+  #intro h1 {
+    font-size: 4em;
+    letter-spacing: 14px;
+    color: #8b0000;
+    text-shadow: 0 0 20px #f00, 0 0 60px #500;
+    animation: pulse 3s ease-in-out infinite;
   }
-  p {
+  #intro .sub {
     margin-top: 20px;
-    color: #888;
-    font-size: 1.2em;
+    font-size: 0.9em;
+    color: #666;
+    letter-spacing: 4px;
   }
+  #intro .tap {
+    margin-top: 80px;
+    font-size: 1.1em;
+    color: #aaa;
+    letter-spacing: 3px;
+    animation: blink 1.5s ease-in-out infinite;
+    cursor: pointer;
+    padding: 15px 40px;
+    border: 1px solid #500;
+    border-radius: 4px;
+    background: rgba(255,0,0,0.05);
+  }
+
+  @keyframes pulse {
+    0%, 100% { text-shadow: 0 0 20px #f00, 0 0 60px #500; }
+    50% { text-shadow: 0 0 40px #f00, 0 0 100px #900; }
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ===== SCENE 1 ===== */
+  #scene1 {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 2s ease;
+  }
+  #scene1.show { display: flex; opacity: 1; }
+
+  #scene1 .time {
+    font-size: 3em;
+    color: #f00;
+    letter-spacing: 10px;
+    text-shadow: 0 0 20px #f00, 0 0 50px #900;
+    animation: flicker 4s infinite;
+  }
+  #scene1 .text {
+    margin-top: 40px;
+    font-size: 1.2em;
+    color: #999;
+    letter-spacing: 2px;
+    line-height: 1.8;
+    max-width: 500px;
+    padding: 0 20px;
+  }
+
   @keyframes flicker {
     0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
-    20%, 24%, 55% { opacity: 0.4; }
+    20%, 24%, 55% { opacity: 0.3; }
+    21% { opacity: 0.6; }
   }
 </style>
 </head>
 <body>
-  <div id="scene">
-    <h1>3:00 AM</h1>
-    <p>You wake up...</p>
+
+<div id="game">
+
+  <!-- INTRO SCREEN -->
+  <div id="intro">
+    <h1>HAVELI</h1>
+    <div class="sub">— 3 A M —</div>
+    <div class="tap" id="tapBtn">TAP TO BEGIN</div>
   </div>
+
+  <!-- SCENE 1 -->
+  <div id="scene1">
+    <div class="time">3:00 AM</div>
+    <div class="text">You wake up.<br>Something feels wrong.</div>
+  </div>
+
+</div>
+
+<script>
+  // ===== AUDIO ENGINE (generates spooky drone without any file) =====
+  let audioCtx = null;
+  function startAmbient() {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      // Low rumbling drone
+      const osc1 = audioCtx.createOscillator();
+      osc1.type = 'sine';
+      osc1.frequency.value = 55;
+      const gain1 = audioCtx.createGain();
+      gain1.gain.value = 0.15;
+      osc1.connect(gain1).connect(audioCtx.destination);
+      osc1.start();
+
+      // High eerie whine
+      const osc2 = audioCtx.createOscillator();
+      osc2.type = 'sine';
+      osc2.frequency.value = 220;
+      const gain2 = audioCtx.createGain();
+      gain2.gain.value = 0.03;
+      osc2.connect(gain2).connect(audioCtx.destination);
+      osc2.start();
+
+      // Slow LFO on drone volume for breathing effect
+      const lfo = audioCtx.createOscillator();
+      lfo.frequency.value = 0.15;
+      const lfoGain = audioCtx.createGain();
+      lfoGain.gain.value = 0.08;
+      lfo.connect(lfoGain).connect(gain1.gain);
+      lfo.start();
+
+    } catch(e) { console.log('audio err', e); }
+  }
+
+  // ===== INTRO → SCENE 1 TRANSITION =====
+  const tapBtn = document.getElementById('tapBtn');
+  const intro = document.getElementById('intro');
+  const scene1 = document.getElementById('scene1');
+
+  tapBtn.addEventListener('click', () => {
+    startAmbient();
+    intro.classList.add('fade-out');
+    setTimeout(() => {
+      scene1.classList.add('show');
+    }, 1200);
+  });
+</script>
+
 </body>
 </html>
