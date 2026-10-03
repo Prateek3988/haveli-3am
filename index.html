@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HAVELI — 3 AM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000;
+    color: #c00;
+    font-family: 'Courier New', monospace;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    text-align: center;
+  }
+  #scene {
+    animation: flicker 3s infinite;
+  }
+  h1 {
+    font-size: 3em;
+    letter-spacing: 8px;
+    text-shadow: 0 0 20px #f00, 0 0 40px #900;
+  }
+  p {
+    margin-top: 20px;
+    color: #888;
+    font-size: 1.2em;
+  }
+  @keyframes flicker {
+    0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
+    20%, 24%, 55% { opacity: 0.4; }
+  }
+</style>
+</head>
+<body>
+  <div id="scene">
+    <h1>3:00 AM</h1>
+    <p>You wake up...</p>
+  </div>
+</body>
+</html>
