@@ -7,8 +7,7 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
-    background: #000;
-    color: #c00;
+    background: #000; color: #c00;
     font-family: 'Courier New', monospace;
     height: 100vh; width: 100vw;
     overflow: hidden; user-select: none; position: fixed;
@@ -19,7 +18,6 @@
     justify-content: center; align-items: center;
     text-align: center; padding: 20px;
   }
-
   #intro {
     position: absolute; inset: 0;
     display: flex; flex-direction: column;
@@ -27,27 +25,19 @@
     z-index: 10; transition: opacity 1.5s ease;
   }
   #intro.fade-out { opacity: 0; pointer-events: none; }
-
   #intro h1 {
-    font-size: 4em; letter-spacing: 14px;
-    color: #8b0000;
+    font-size: 4em; letter-spacing: 14px; color: #8b0000;
     text-shadow: 0 0 20px #f00, 0 0 60px #500;
     animation: pulse 3s ease-in-out infinite;
   }
-  #intro .sub {
-    margin-top: 20px; font-size: 0.9em;
-    color: #666; letter-spacing: 4px;
-  }
+  #intro .sub { margin-top: 20px; font-size: 0.9em; color: #666; letter-spacing: 4px; }
   #intro .tap {
-    margin-top: 80px; font-size: 1.1em;
-    color: #aaa; letter-spacing: 3px;
+    margin-top: 80px; font-size: 1.1em; color: #aaa; letter-spacing: 3px;
     animation: blink 1.5s ease-in-out infinite;
     cursor: pointer; padding: 15px 40px;
     border: 1px solid #500; border-radius: 4px;
     background: rgba(255,0,0,0.05);
   }
-
-  /* AUDIO STATUS BADGE */
   #audioStatus {
     position: absolute; top: 15px; right: 15px;
     font-size: 0.7em; letter-spacing: 2px;
@@ -56,21 +46,16 @@
     z-index: 100; transition: all 0.3s;
   }
   #audioStatus.on { color: #0f0; border-color: #0f0; box-shadow: 0 0 10px #0f0; }
-  #audioStatus.err { color: #f00; border-color: #f00; }
-
   @keyframes pulse {
     0%, 100% { text-shadow: 0 0 20px #f00, 0 0 60px #500; }
     50% { text-shadow: 0 0 40px #f00, 0 0 100px #900; }
   }
-  @keyframes blink {
-    0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
-  }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
   #scene1 {
-    position: absolute; inset: 0;
-    display: none; flex-direction: column;
-    justify-content: center; align-items: center;
-    opacity: 0; transition: opacity 2s ease;
+    position: absolute; inset: 0; display: none;
+    flex-direction: column; justify-content: center;
+    align-items: center; opacity: 0; transition: opacity 2s ease;
   }
   #scene1.show { display: flex; opacity: 1; }
   #scene1 .time {
@@ -79,13 +64,13 @@
     animation: flicker 4s infinite;
   }
   #scene1 .text {
-    margin-top: 40px; font-size: 1.2em;
-    color: #999; letter-spacing: 2px;
-    line-height: 1.8; max-width: 500px; padding: 0 20px;
+    margin-top: 40px; font-size: 1.2em; color: #999;
+    letter-spacing: 2px; line-height: 1.8;
+    max-width: 500px; padding: 0 20px;
   }
   @keyframes flicker {
-    0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
-    20%, 24%, 55% { opacity: 0.3; } 21% { opacity: 0.6; }
+    0%,18%,22%,25%,53%,57%,100%{opacity:1;}
+    20%,24%,55%{opacity:0.3;} 21%{opacity:0.6;}
   }
 </style>
 </head>
@@ -109,53 +94,100 @@
 <script>
   const statusBadge = document.getElementById('audioStatus');
   let audioCtx = null;
+  let windGain, heartTimer;
 
+  // ============================================
+  // WIND — generated from noise, filtered to sound like howling
+  // ============================================
+  function createWind(ctx) {
+    // Create 2 seconds of white noise
+    const bufferSize = ctx.sampleRate * 2;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+    noise.loop = true;
+
+    // Bandpass filter to make it sound like wind (not static)
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 500;
+    filter.Q.value = 0.7;
+
+    // Volume control with slow LFO for "howling" gust effect
+    const gain = ctx.createGain();
+    gain.gain.value = 0.25;
+
+    noise.connect(filter).connect(gain).connect(ctx.destination);
+    noise.start();
+
+    // Slow LFO = wind gusts getting louder/quieter
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.1;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 0.15;
+    lfo.connect(lfoGain).connect(gain.gain);
+    lfo.start();
+
+    return gain;
+  }
+
+  // ============================================
+  // HEARTBEAT — two thumps, repeating every ~1.2s
+  // ============================================
+  function playHeartbeat(ctx) {
+    const thump = (time, vol) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(80, time);
+      osc.frequency.exponentialRampToValueAtTime(40, time + 0.15);
+      g.gain.setValueAtTime(vol, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(time);
+      osc.stop(time + 0.25);
+    };
+    thump(ctx.currentTime, 0.4);
+    thump(ctx.currentTime + 0.25, 0.25);
+  }
+
+  function startHeartbeat(ctx) {
+    playHeartbeat(ctx);
+    heartTimer = setInterval(() => playHeartbeat(ctx), 1200);
+  }
+
+  // ============================================
+  // START EVERYTHING
+  // ============================================
   function startAmbient() {
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
 
-      // 🔔 TEST BEEP — loud & clear, so you KNOW audio works
+      // Test beep so you know audio works
       const beep = audioCtx.createOscillator();
       const beepGain = audioCtx.createGain();
       beep.type = 'sine';
       beep.frequency.value = 880;
-      beepGain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-      beepGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+      beepGain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+      beepGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
       beep.connect(beepGain).connect(audioCtx.destination);
       beep.start();
-      beep.stop(audioCtx.currentTime + 0.5);
+      beep.stop(audioCtx.currentTime + 0.4);
 
-      // 🔊 LOW DRONE (now 3x louder)
-      const osc1 = audioCtx.createOscillator();
-      osc1.type = 'sine';
-      osc1.frequency.value = 55;
-      const gain1 = audioCtx.createGain();
-      gain1.gain.value = 0.45;
-      osc1.connect(gain1).connect(audioCtx.destination);
-      osc1.start();
+      // Wind
+      windGain = createWind(audioCtx);
 
-      // 🔊 EERIE HIGH WHINE (now 5x louder)
-      const osc2 = audioCtx.createOscillator();
-      osc2.type = 'sine';
-      osc2.frequency.value = 210;
-      const gain2 = audioCtx.createGain();
-      gain2.gain.value = 0.15;
-      osc2.connect(gain2).connect(audioCtx.destination);
-      osc2.start();
-
-      // Breathing LFO
-      const lfo = audioCtx.createOscillator();
-      lfo.frequency.value = 0.15;
-      const lfoGain = audioCtx.createGain();
-      lfoGain.gain.value = 0.25;
-      lfo.connect(lfoGain).connect(gain1.gain);
-      lfo.start();
+      // Heartbeat starts after 3 seconds (once we're in the scene)
+      setTimeout(() => startHeartbeat(audioCtx), 3000);
 
       statusBadge.textContent = '🔊 AUDIO ON';
       statusBadge.classList.add('on');
     } catch(e) {
       statusBadge.textContent = '⚠️ AUDIO ERROR';
-      statusBadge.classList.add('err');
       console.log('audio err', e);
     }
   }
