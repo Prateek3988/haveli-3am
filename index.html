@@ -17,21 +17,14 @@
     display: flex; flex-direction: column;
     justify-content: center; align-items: center;
     text-align: center; padding: 20px;
-    transition: filter 0.3s, transform 0.1s;
   }
   #game.shake { animation: shake 0.5s infinite; }
-  #game.flash { animation: flash 0.15s infinite; }
 
   @keyframes shake {
     0%,100% { transform: translate(0,0); }
     25% { transform: translate(-8px, 4px); }
     50% { transform: translate(6px, -6px); }
     75% { transform: translate(-4px, -8px); }
-  }
-  @keyframes flash {
-    0% { filter: brightness(1); }
-    50% { filter: brightness(3) hue-rotate(-30deg); }
-    100% { filter: brightness(1); }
   }
 
   #audioStatus {
@@ -43,7 +36,6 @@
   }
   #audioStatus.on { color: #0f0; border-color: #0f0; box-shadow: 0 0 10px #0f0; }
 
-  /* INTRO */
   #intro {
     position: absolute; inset: 0;
     display: flex; flex-direction: column;
@@ -70,7 +62,6 @@
   }
   @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
-  /* STORY SCENE */
   #scene {
     position: absolute; inset: 0;
     display: none; flex-direction: column;
@@ -99,23 +90,18 @@
     margin-bottom: 30px;
   }
   #storyText .line {
-    display: block;
-    opacity: 0;
+    display: block; opacity: 0;
     animation: fadeInLine 2s forwards;
   }
   #storyText .line:nth-child(1) { animation-delay: 0.3s; }
   #storyText .line:nth-child(2) { animation-delay: 2s; }
   #storyText .line:nth-child(3) { animation-delay: 4s; }
   #storyText .line:nth-child(4) { animation-delay: 6.5s; }
-  @keyframes fadeInLine {
-    to { opacity: 1; }
-  }
+  @keyframes fadeInLine { to { opacity: 1; } }
 
   #choices {
-    display: none;
-    flex-direction: column;
-    gap: 15px;
-    margin-top: 20px;
+    display: none; flex-direction: column;
+    gap: 15px; margin-top: 20px;
     opacity: 0;
     animation: fadeInLine 1.5s forwards;
     animation-delay: 0.5s;
@@ -125,8 +111,7 @@
   .choice {
     padding: 16px 30px;
     font-family: 'Courier New', monospace;
-    font-size: 1em;
-    letter-spacing: 2px;
+    font-size: 1em; letter-spacing: 2px;
     color: #ccc;
     background: rgba(255,255,255,0.03);
     border: 1px solid #444;
@@ -137,27 +122,22 @@
   }
   .choice:hover, .choice:active {
     background: rgba(255,0,0,0.15);
-    border-color: #900;
-    color: #fff;
+    border-color: #900; color: #fff;
     box-shadow: 0 0 15px rgba(255,0,0,0.3);
   }
 
-  /* JUMP SCARE SCREEN */
   #scare {
     position: fixed; inset: 0;
     display: none;
     justify-content: center; align-items: center;
-    background: #000;
-    z-index: 999;
+    background: #000; z-index: 999;
   }
   #scare.show { display: flex; }
 
   #scareFace {
     width: 100%; height: 100%;
     background: radial-gradient(ellipse at center, #300 0%, #000 70%);
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    display: flex; justify-content: center; align-items: center;
     animation: scareZoom 0.3s ease-out;
   }
   @keyframes scareZoom {
@@ -166,8 +146,7 @@
   }
 
   #scareFace .ghost {
-    font-size: 12em;
-    color: #f00;
+    font-size: 12em; color: #f00;
     text-shadow: 0 0 40px #f00, 0 0 80px #900, 0 0 120px #500;
     animation: ghostPulse 0.15s infinite;
     line-height: 1;
@@ -178,10 +157,8 @@
   }
 
   #scareFace .msg {
-    position: absolute;
-    bottom: 60px;
-    font-size: 1.3em;
-    color: #f00;
+    position: absolute; bottom: 60px;
+    font-size: 1.3em; color: #f00;
     letter-spacing: 6px;
     text-shadow: 0 0 20px #f00;
     animation: blink 0.6s infinite;
@@ -221,8 +198,29 @@
   const scareEl = document.getElementById('scare');
   let audioCtx = null;
   let heartTimer = null;
-  let heartbeatRate = 1200; // ms between beats
+  let heartbeatRate = 1200;
   let heartbeatVol = 0.3;
+  let convolver = null;
+
+  // ============================================
+  // REVERB — gives the whole game a "haunted haveli" feel
+  // ============================================
+  function createReverb(ctx) {
+    const duration = 2.5;
+    const decay = 2.5;
+    const rate = ctx.sampleRate;
+    const length = rate * duration;
+    const impulse = ctx.createBuffer(2, length, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = impulse.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i/length, decay);
+      }
+    }
+    const conv = ctx.createConvolver();
+    conv.buffer = impulse;
+    return conv;
+  }
 
   // ============================================
   // AUDIO ENGINE
@@ -233,8 +231,7 @@
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
     const noise = ctx.createBufferSource();
-    noise.buffer = buffer;
-    noise.loop = true;
+    noise.buffer = buffer; noise.loop = true;
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
     filter.frequency.value = 500;
@@ -261,8 +258,7 @@
     g.gain.setValueAtTime(vol, time);
     g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
     osc.connect(g).connect(ctx.destination);
-    osc.start(time);
-    osc.stop(time + 0.25);
+    osc.start(time); osc.stop(time + 0.25);
   }
 
   function playHeartbeat(ctx) {
@@ -277,24 +273,70 @@
     heartTimer = setInterval(() => playHeartbeat(audioCtx), heartbeatRate);
   }
 
-  // PAYAL — tiny bell sounds (anklets)
-  function playPayal(ctx) {
-    const notes = [1800, 2100, 1950, 2200, 1850, 2050];
-    notes.forEach((freq, i) => {
-      const t = ctx.currentTime + i * 0.28;
+  // ============================================
+  // ✨ REAL PAYAL — metallic jingling bells
+  // ============================================
+  // Each strike = a tiny metallic bell with inharmonic partials + shimmer decay
+  // Multiple bells clustered per step (like real payal has many ghungroos)
+  function strikeBell(ctx, time, vol, baseFreq) {
+    // Real bell = multiple inharmonic partials, not a pure tone
+    const partials = [
+      { ratio: 1.0,  vol: 1.0,  decay: 0.35 },
+      { ratio: 2.76, vol: 0.55, decay: 0.22 }, // characteristic bell partial
+      { ratio: 5.4,  vol: 0.35, decay: 0.15 },
+      { ratio: 8.9,  vol: 0.2,  decay: 0.1  },
+      { ratio: 13.3, vol: 0.1,  decay: 0.06 }
+    ];
+    partials.forEach(p => {
       const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = baseFreq * p.ratio;
       const g = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.value = freq;
-      g.gain.setValueAtTime(0.15, t);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-      osc.connect(g).connect(ctx.destination);
-      osc.start(t);
-      osc.stop(t + 0.4);
+      g.gain.setValueAtTime(0, time);
+      g.gain.linearRampToValueAtTime(vol * p.vol * 0.4, time + 0.003); // sharp attack
+      g.gain.exponentialRampToValueAtTime(0.0001, time + p.decay + 0.3);
+      osc.connect(g);
+      // Route through reverb for that haveli echo
+      if (convolver) {
+        g.connect(convolver);
+        const dry = ctx.createGain();
+        dry.gain.value = 0.6;
+        g.connect(dry).connect(ctx.destination);
+      } else {
+        g.connect(ctx.destination);
+      }
+      osc.start(time);
+      osc.stop(time + p.decay + 0.4);
     });
   }
 
-  // KNOCK — three low thuds
+  // A "step" = 6-10 tiny bells shaking together (like walking)
+  function payalStep(ctx, time, foot, isLeft) {
+    // Slight variation per step so it feels human
+    const baseFreq = isLeft ? 2600 : 2900;
+    const bellCount = 7 + Math.floor(Math.random() * 4); // 7-10 bells
+    for (let i = 0; i < bellCount; i++) {
+      // Each ghungroo has a slightly different pitch
+      const freq = baseFreq + (Math.random() - 0.5) * 800;
+      // Micro timing jitter — bells don't ring in perfect sync
+      const offset = Math.random() * 0.06;
+      // Volume varies per bell
+      const vol = 0.10 + Math.random() * 0.08;
+      strikeBell(ctx, time + offset, vol, freq);
+    }
+  }
+
+  // Walking pattern: left-right-left-right with natural timing
+  function playPayal(ctx) {
+    const start = ctx.currentTime + 0.1;
+    // 6 steps of a slow walk, slight timing irregularity
+    const steps = [0, 0.62, 1.25, 1.85, 2.48, 3.12];
+    steps.forEach((offset, i) => {
+      const jitter = (Math.random() - 0.5) * 0.06;
+      payalStep(ctx, start + offset + jitter, i, i % 2 === 0);
+    });
+  }
+
   function playKnock(ctx) {
     [0, 0.4, 0.8].forEach(delay => {
       const t = ctx.currentTime + delay;
@@ -302,7 +344,6 @@
     });
   }
 
-  // SCREAM — harsh filtered noise burst
   function playScream(ctx) {
     const dur = 1.8;
     const bufferSize = ctx.sampleRate * dur;
@@ -322,8 +363,7 @@
     g.gain.setValueAtTime(0.6, ctx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
     src.connect(filter).connect(g).connect(ctx.destination);
-    src.start();
-    src.stop(ctx.currentTime + dur);
+    src.start(); src.stop(ctx.currentTime + dur);
   }
 
   function beep(ctx) {
@@ -333,8 +373,7 @@
     g.gain.setValueAtTime(0.2, ctx.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
     osc.connect(g).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
+    osc.start(); osc.stop(ctx.currentTime + 0.4);
   }
 
   // ============================================
@@ -344,6 +383,8 @@
     try {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
+      convolver = createReverb(audioCtx);
+      convolver.connect(audioCtx.destination);
       beep(audioCtx);
       createWind(audioCtx);
       statusBadge.textContent = '🔊 AUDIO ON';
@@ -396,7 +437,6 @@
       'You hear something outside your door...'
     ], 1.8, () => {
       playPayal(audioCtx);
-      // Speed heartbeat up
       heartbeatRate = 900;
       heartbeatVol = 0.35;
       startHeartbeat();
@@ -407,7 +447,7 @@
             { label: '🛏️ HIDE UNDER THE BED', action: choiceHide }
           ]);
         });
-      }, 4000);
+      }, 5000);
     });
   }
 
@@ -425,7 +465,6 @@
       'The anklets stop... right outside.',
       'The door creaks open.'
     ], 1.8, () => {
-      // Part 3 will continue from here
       showLines([
         'A pair of feet appear.',
         'They face the wrong way.',
@@ -438,7 +477,6 @@
     playScream(audioCtx);
     gameEl.classList.add('shake');
     scareEl.classList.add('show');
-    // Buzz sound continues
     const buzz = audioCtx.createOscillator();
     const buzzG = audioCtx.createGain();
     buzz.type = 'sawtooth';
@@ -454,9 +492,6 @@
     }, 3500);
   }
 
-  // ============================================
-  // TAP TO BEGIN
-  // ============================================
   const tapBtn = document.getElementById('tapBtn');
   const intro = document.getElementById('intro');
   tapBtn.addEventListener('click', () => {
